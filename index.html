@@ -429,76 +429,51 @@
                     
                     // Process tariff numbers
                     const tariffColumns = ['TARIFF NUM', 'TARIFF NUM_1', 'TARIFF NUM_2', 'TARIFF NUM_3', 'TARIFF NUM_4', 'TARIFF NUM_5'];
-                    let nonBaseTariff = null;
-                    const baseTariffs = [];
+                    const allTariffs = [];
                     
+                    // Collect all tariffs in order
                     tariffColumns.forEach(col => {
                         const tariff = mankiRow[col];
                         if (tariff && String(tariff).trim() !== '') {
-                            if (isBaseTariff(tariff)) {
-                                baseTariffs.push(tariff);
-                            } else if (!nonBaseTariff) {
-                                nonBaseTariff = tariff;
-                            }
+                            allTariffs.push({
+                                value: tariff,
+                                isBase: isBaseTariff(tariff)
+                            });
                         }
                     });
                     
-                    // Set TariffNumber (first non-base tariff)
-                    if (nonBaseTariff) {
-                        outputRow['TariffNumber'] = nonBaseTariff;
+                    // First tariff (should be non-base) goes to TariffNumber
+                    if (allTariffs.length > 0) {
+                        outputRow['TariffNumber'] = allTariffs[0].value;
                     }
                     
-                    // Set base tariffs
+                    // Remaining tariffs go to Secondary, Third, 4, 5, 6, 7, 8
                     const netWeight = oneviewRow.NetWeight || 0;
                     const roundedWeight = Math.round(netWeight);
                     
-                    if (baseTariffs.length > 0) {
-                        // First base tariff -> Secondary
-                        outputRow['SecondaryTariffNumber'] = baseTariffs[0];
-                        outputRow['Secondary Quantity1'] = roundedWeight;
-                        outputRow['Secondaryunitofmeasure1'] = 'L';
-                    }
+                    const tariffMapping = [
+                        { number: 'SecondaryTariffNumber', quantity: 'Secondary Quantity1', unit: 'Secondaryunitofmeasure1' },
+                        { number: 'ThirdTariffNumber', quantity: 'ThirdTariffQuantity1', unit: 'ThirdTariffUnitofMeasure1' },
+                        { number: '4TariffNumber', quantity: '4TariffQuantity1', unit: '4TariffUnitofMeasure1' },
+                        { number: '5TariffNumber', quantity: '5TariffQuantity1', unit: '5TariffUnitofMeasure1' },
+                        { number: '6TariffNumber', quantity: '6TariffQuantity1', unit: '6TariffUnitofMeasure1' },
+                        { number: '7TariffNumber', quantity: '7TariffQuantity1', unit: '7TariffUnitofMeasure1' },
+                        { number: '8TariffNumber', quantity: '8TariffQuantity1', unit: '8TariffUnitofMeasure1' }
+                    ];
                     
-                    if (baseTariffs.length > 1) {
-                        // Second base tariff -> Third
-                        outputRow['ThirdTariffNumber'] = baseTariffs[1];
-                        outputRow['ThirdTariffQuantity1'] = roundedWeight;
-                        outputRow['ThirdTariffUnitofMeasure1'] = 'L';
-                    }
-                    
-                    if (baseTariffs.length > 2) {
-                        // Third base tariff -> 4
-                        outputRow['4TariffNumber'] = baseTariffs[2];
-                        outputRow['4TariffQuantity1'] = roundedWeight;
-                        outputRow['4TariffUnitofMeasure1'] = 'L';
-                    }
-                    
-                    if (baseTariffs.length > 3) {
-                        // Fourth base tariff -> 5
-                        outputRow['5TariffNumber'] = baseTariffs[3];
-                        outputRow['5TariffQuantity1'] = roundedWeight;
-                        outputRow['5TariffUnitofMeasure1'] = 'L';
-                    }
-                    
-                    if (baseTariffs.length > 4) {
-                        // Fifth base tariff -> 6
-                        outputRow['6TariffNumber'] = baseTariffs[4];
-                        outputRow['6TariffQuantity1'] = roundedWeight;
-                        outputRow['6TariffUnitofMeasure1'] = 'L';
-                    }
-                    
-                    if (baseTariffs.length > 5) {
-                        // Sixth base tariff -> 7
-                        outputRow['7TariffNumber'] = baseTariffs[5];
-                        outputRow['7TariffQuantity1'] = roundedWeight;
-                        outputRow['7TariffUnitofMeasure1'] = 'L';
-                    }
-                    
-                    if (baseTariffs.length > 6) {
-                        // Seventh base tariff -> 8
-                        outputRow['8TariffNumber'] = baseTariffs[6];
-                        outputRow['8TariffQuantity1'] = roundedWeight;
-                        outputRow['8TariffUnitofMeasure1'] = 'L';
+                    // Process remaining tariffs (starting from index 1)
+                    for (let i = 1; i < allTariffs.length && i <= 7; i++) {
+                        const tariff = allTariffs[i];
+                        const mapping = tariffMapping[i - 1];
+                        
+                        // Set tariff number
+                        outputRow[mapping.number] = tariff.value;
+                        
+                        // If it's a base tariff, add quantity and unit
+                        if (tariff.isBase) {
+                            outputRow[mapping.quantity] = roundedWeight;
+                            outputRow[mapping.unit] = 'L';
+                        }
                     }
                 } else {
                     unmatchedCount++;
