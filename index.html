@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tariff Code Mapping Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .upload-section {
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-section:hover {
+            border-color: #667eea;
+            background: #f0f1ff;
+        }
+        
+        .upload-section.dragover {
+            border-color: #667eea;
+            background: #e8eaff;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .upload-label {
+            display: inline-block;
+            padding: 12px 30px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: transform 0.2s;
+        }
+        
+        .upload-label:hover {
+            transform: translateY(-2px);
+        }
+        
+        .file-info {
+            margin-top: 15px;
+            color: #495057;
+            font-size: 14px;
+        }
+        
+        .process-btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .process-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .process-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .results {
+            margin-top: 20px;
+        }
+        
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+        }
+        
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+        
+        .download-btn {
+            width: 100%;
+            padding: 15px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #856404;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 10px;
+            color: #856404;
+        }
+        
+        .instructions ul {
+            margin-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 5px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 Tariff Code Mapping Tool</h1>
+        <p class="subtitle">Upload OneView Excel file to populate IES template</p>
+        
+        <div id="loadingMessage" class="loading">
+            <div class="spinner"></div>
+            <p>Loading reference files...</p>
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="instructions">
+                <h3>How it works:</h3>
+                <ul>
+                    <li>Upload your OneView Excel file</li>
+                    <li>Non-base tariffs (starting with 98/99) go in TariffNumber</li>
+                    <li>Base tariffs populate Secondary/Third/etc. TariffNumbers with NetWeight (L)</li>
+                    <li>Download the populated template</li>
+                </ul>
+            </div>
+            
+            <div class="upload-section" id="uploadSection">
+                <label for="fileInput" class="upload-label">
+                    📁 Choose OneView File
+                </label>
+                <input type="file" id="fileInput" accept=".xlsx,.xls" />
+                <div class="file-info" id="fileInfo">No file selected</div>
+            </div>
+            
+            <button class="process-btn" id="processBtn" disabled>Process File</button>
+            
+            <div class="status" id="status"></div>
+            
+            <div class="results" id="results" style="display: none;">
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalRows">0</div>
+                        <div class="stat-label">Total Rows</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="matchedRows">0</div>
+                        <div class="stat-label">Matched</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="unmatchedRows">0</div>
+                        <div class="stat-label">Unmatched</div>
+                    </div>
+                </div>
+                <button class="download-btn" id="downloadBtn">⬇️ Download Populated Template</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration - Update these paths to match your GitHub repository structure
+        const CONFIG = {
+            MANKI_DB_PATH: 'updated_manki_db.xlsx',
+            TEMPLATE_PATH: 'ies_upload_template.xlsx'
+        };
+
+        let oneviewData = null;
+        let mankiDbData = null;
+        let templateHeaders = null;
+        let processedWorkbook = null;
+
+        // Load reference files from the repository
+        async function loadReferenceFiles() {
+            try {
+                // Load manki_db
+                const mankiResponse = await fetch(CONFIG.MANKI_DB_PATH);
+                if (!mankiResponse.ok) throw new Error('Failed to load Manki DB file');
+                const mankiArrayBuffer = await mankiResponse.arrayBuffer();
+                const mankiWorkbook = XLSX.read(mankiArrayBuffer);
+                mankiDbData = XLSX.utils.sheet_to_json(mankiWorkbook.Sheets[mankiWorkbook.SheetNames[0]]);
+                
+                // Load template
+                const templateResponse = await fetch(CONFIG.TEMPLATE_PATH);
+                if (!templateResponse.ok) throw new Error('Failed to load template file');
+                const templateArrayBuffer = await templateResponse.arrayBuffer();
+                const templateWorkbook = XLSX.read(templateArrayBuffer);
+                const templateSheet = templateWorkbook.Sheets[templateWorkbook.SheetNames[0]];
+                const range = XLSX.utils.decode_range(templateSheet['!ref']);
+                
+                templateHeaders = [];
+                for (let col = range.s.c; col <= range.e.c; col++) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
+                    const cell = templateSheet[cellAddress];
+                    if (cell && cell.v) {
+                        templateHeaders.push(cell.v);
+                    }
+                }
+                
+                // Hide loading message and show main content
+                document.getElementById('loadingMessage').style.display = 'none';
+                document.getElementById('mainContent').style.display = 'block';
+                showStatus('Reference files loaded successfully. Ready to process OneView files.', 'success');
+            } catch (error) {
+                document.getElementById('loadingMessage').innerHTML = 
+                    `<p style="color: #721c24;">Error loading reference files: ${error.message}</p>
+                     <p style="color: #721c24; font-size: 12px; margin-top: 10px;">
+                     Make sure 'updated_manki_db.xlsx' and 'ies_upload_template.xlsx' are in the same directory as this HTML file.
+                     </p>`;
+            }
+        }
+
+        // File upload handling
+        const fileInput = document.getElementById('fileInput');
+        const uploadSection = document.getElementById('uploadSection');
+        const fileInfo = document.getElementById('fileInfo');
+        const processBtn = document.getElementById('processBtn');
+
+        fileInput.addEventListener('change', handleFileSelect);
+        
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('dragover');
+        });
+        
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('dragover');
+        });
+        
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect();
+            }
+        });
+
+        function handleFileSelect() {
+            const file = fileInput.files[0];
+            if (file) {
+                fileInfo.textContent = `Selected: ${file.name}`;
+                processBtn.disabled = false;
+                
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    oneviewData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    showStatus(`File loaded: ${oneviewData.length} rows found`, 'info');
+                };
+                reader.readAsArrayBuffer(file);
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status ${type}`;
+            status.style.display = 'block';
+        }
+
+        function isBaseTariff(tariffNum) {
+            if (!tariffNum) return false;
+            const tariffStr = String(tariffNum).trim();
+            return !tariffStr.startsWith('98') && !tariffStr.startsWith('99');
+        }
+
+        processBtn.addEventListener('click', processData);
+
+        function processData() {
+            if (!oneviewData || !mankiDbData || !templateHeaders) {
+                showStatus('Missing data. Please ensure all files are loaded.', 'error');
+                return;
+            }
+
+            showStatus('Processing data...', 'info');
+            
+            const outputData = [];
+            let matchedCount = 0;
+            let unmatchedCount = 0;
+
+            oneviewData.forEach(oneviewRow => {
+                const partNumber = String(oneviewRow.BuyerPartNumber || '').trim();
+                
+                // Find matching row in manki_db
+                const mankiRow = mankiDbData.find(row => 
+                    String(row['PRIMARY PART NUM'] || '').trim() === partNumber
+                );
+
+                const outputRow = {};
+                
+                // Copy basic fields from oneview
+                templateHeaders.forEach(header => {
+                    if (oneviewRow.hasOwnProperty(header)) {
+                        outputRow[header] = oneviewRow[header];
+                    } else {
+                        outputRow[header] = '';
+                    }
+                });
+
+                if (mankiRow) {
+                    matchedCount++;
+                    
+                    // Process tariff numbers
+                    const tariffColumns = ['TARIFF NUM', 'TARIFF NUM_1', 'TARIFF NUM_2', 'TARIFF NUM_3', 'TARIFF NUM_4', 'TARIFF NUM_5'];
+                    let nonBaseTariff = null;
+                    const baseTariffs = [];
+                    
+                    tariffColumns.forEach(col => {
+                        const tariff = mankiRow[col];
+                        if (tariff && String(tariff).trim() !== '') {
+                            if (isBaseTariff(tariff)) {
+                                baseTariffs.push(tariff);
+                            } else if (!nonBaseTariff) {
+                                nonBaseTariff = tariff;
+                            }
+                        }
+                    });
+                    
+                    // Set TariffNumber (first non-base tariff)
+                    if (nonBaseTariff) {
+                        outputRow['TariffNumber'] = nonBaseTariff;
+                    }
+                    
+                    // Set base tariffs
+                    const netWeight = oneviewRow.NetWeight || 0;
+                    const roundedWeight = Math.round(netWeight);
+                    
+                    if (baseTariffs.length > 0) {
+                        // First base tariff -> Secondary
+                        outputRow['SecondaryTariffNumber'] = baseTariffs[0];
+                        outputRow['Secondary Quantity1'] = roundedWeight;
+                        outputRow['Secondaryunitofmeasure1'] = 'L';
+                    }
+                    
+                    if (baseTariffs.length > 1) {
+                        // Second base tariff -> Third
+                        outputRow['ThirdTariffNumber'] = baseTariffs[1];
+                        outputRow['ThirdTariffQuantity1'] = roundedWeight;
+                        outputRow['ThirdTariffUnitofMeasure1'] = 'L';
+                    }
+                    
+                    if (baseTariffs.length > 2) {
+                        // Third base tariff -> 4
+                        outputRow['4TariffNumber'] = baseTariffs[2];
+                        outputRow['4TariffQuantity1'] = roundedWeight;
+                        outputRow['4TariffUnitofMeasure1'] = 'L';
+                    }
+                    
+                    if (baseTariffs.length > 3) {
+                        // Fourth base tariff -> 5
+                        outputRow['5TariffNumber'] = baseTariffs[3];
+                        outputRow['5TariffQuantity1'] = roundedWeight;
+                        outputRow['5TariffUnitofMeasure1'] = 'L';
+                    }
+                    
+                    if (baseTariffs.length > 4) {
+                        // Fifth base tariff -> 6
+                        outputRow['6TariffNumber'] = baseTariffs[4];
+                        outputRow['6TariffQuantity1'] = roundedWeight;
+                        outputRow['6TariffUnitofMeasure1'] = 'L';
+                    }
+                    
+                    if (baseTariffs.length > 5) {
+                        // Sixth base tariff -> 7
+                        outputRow['7TariffNumber'] = baseTariffs[5];
+                        outputRow['7TariffQuantity1'] = roundedWeight;
+                        outputRow['7TariffUnitofMeasure1'] = 'L';
+                    }
+                    
+                    if (baseTariffs.length > 6) {
+                        // Seventh base tariff -> 8
+                        outputRow['8TariffNumber'] = baseTariffs[6];
+                        outputRow['8TariffQuantity1'] = roundedWeight;
+                        outputRow['8TariffUnitofMeasure1'] = 'L';
+                    }
+                } else {
+                    unmatchedCount++;
+                }
+
+                outputData.push(outputRow);
+            });
+
+            // Create workbook
+            const ws = XLSX.utils.json_to_sheet(outputData, { header: templateHeaders });
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+            
+            processedWorkbook = wb;
+
+            // Update stats
+            document.getElementById('totalRows').textContent = oneviewData.length;
+            document.getElementById('matchedRows').textContent = matchedCount;
+            document.getElementById('unmatchedRows').textContent = unmatchedCount;
+            document.getElementById('results').style.display = 'block';
+
+            showStatus(`Processing complete! ${matchedCount} matched, ${unmatchedCount} unmatched`, 'success');
+        }
+
+        document.getElementById('downloadBtn').addEventListener('click', () => {
+            if (processedWorkbook) {
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+                XLSX.writeFile(processedWorkbook, `populated_template_${timestamp}.xlsx`);
+                showStatus('File downloaded successfully!', 'success');
+            }
+        });
+
+        // Load reference files on page load
+        loadReferenceFiles();
+    </script>
+</body>
+</html>
