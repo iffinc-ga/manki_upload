@@ -49,7 +49,6 @@
     .table-body tr:hover td{background:#f8f9fa}
     .table-body td input{width:100%;padding:6px;border:1px solid #ced4da;border-radius:3px;font-size:13px}
     .table-body td input:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 2px rgba(102,126,234,.15)}
-    .readonly{background:#e9ecef!important}
     .actions{text-align:center;white-space:nowrap}
     .actions button{padding:4px 8px;font-size:11px;margin:0 2px}
     .alert{margin:0 20px 20px;border-radius:4px;padding:10px 14px;font-size:13px;display:none}
@@ -116,7 +115,8 @@
     </div>
     <div class="stat editable">
       <div class="stat-label">Invoice Total (Editable)</div>
-      <input autocomplete="off" type="number" step="0.01" id="statTotal" placeholder="0.00"
+      <!-- TEXT input so we can safely show 21742.10 or 21,742.10 -->
+      <input autocomplete="off" type="text" id="statTotal" placeholder="0.00"
              onchange="updateInvoiceTotal(this.value)">
     </div>
     <div class="stat">
@@ -228,12 +228,13 @@
     return isNaN(n) ? NaN : n;
   }
 
-  // EU/US flexible number parser
+  // EU/US-flexible numeric parser
   function parseNum(s){
     if (s == null) return NaN;
     const t = String(s).trim();
     if (!t) return NaN;
 
+    // 1.234,56 or 1,234.56
     if (/\d+[.,]\d{3}[.,]\d{2}$/.test(t)) {
       const lastDot = t.lastIndexOf('.');
       const lastComma = t.lastIndexOf(',');
@@ -244,6 +245,7 @@
         return parseFloat(t.replace(/,/g,''));
       }
     }
+    // 1234,56 (EU style)
     if (/,\d{2}$/.test(t) && !/\.\d{2}$/.test(t)) {
       return parseFloat(t.replace(/\./g,'').replace(',', '.'));
     }
@@ -336,13 +338,15 @@
         pagesText.push(pageText);
       }
 
-      if (!pagesText.some(t => t && t.trim())) {
+      const fullText = pagesText.join('\n');
+
+      if (!fullText.trim()) {
         showAlert('The PDF had no extractable text (might be scanned).', 'error');
         uploadSec.style.display = 'block';
         return;
       }
 
-      parseInvoices(pagesText);
+      parseInvoices(fullText);
 
       if (allData.length) {
         const invoiceCount = new Set(allData.map(d => d.invoice_number)).size;
@@ -361,48 +365,67 @@
     }
   }
 
-  // ===== CORE PARSER (PER PAGE / PER INVOICE) =====
-  function parseInvoices(pagesText) {
+  // ===== CORE PARSER (GROUPED BY INVOICE NUMBER) =====
+  function parseInvoices(text) {
     allData = [];
     invoiceOrder = [];
+    text = String(text || '');
 
-    const headerRegex =
+    const invoicePattern =
       /Invoice\s*no\.\s*\/\s*(?:Date|Datum):\s*([0-9]+)\s*\/\s*(\d{2}\/\d{2}\/\d{4})/g;
 
-    const invoices = [];
-    for (let p = 0; p < pagesText.length; p++) {
-      const txt = pagesText[p];
-      let m;
-      while ((m = headerRegex.exec(txt)) !== null) {
-        invoices.push({
-          pageIndex: p,
-          invoice_number: m[1],
-          invoice_date: m[2]
-        });
-      }
+    const headers = [];
+    let m;
+    while ((m = invoicePattern.exec(text)) !== null) {
+      headers.push({
+        index: m.index,
+        invoice_number: m[1],
+        invoice_date: m[2]
+      });
+    }
+    if (!headers.length) return;
+
+    headers.push({ index: text.length, invoice_number: null, invoice_date: null });
+
+    // Combine all blocks for each invoice number
+    const invoiceBlocks = {}; // inv => { date, text }
+    for (let i = 0; i < headers.length - 1; i++) {
+      const start = headers[i].index;
+      const end   = headers[i + 1].index;
+      const inv   = headers[i].invoice_number;
+      const date  = headers[i].invoice_date;
+      if (!inv) continue;
+      const block = text.slice(start, end);
+      if (!invoiceBlocks[inv]) invoiceBlocks[inv] = { date, text: '' };
+      invoiceBlocks[inv].text += block + '\n';
     }
 
     const linePattern =
       /(\d{5,6})\s+([A-Z0-9]+)\s+(\d+)\s*(PC)?\s+([\d.,]+)\s+USD\s+(\d+)\s*(PC)?\s+([\d.,]+)/g;
 
-    invoices.forEach(inv => {
-      const p = inv.pageIndex;
-      let block = pagesText[p] || '';
-      if (p > 0) {
-        block = (pagesText[p - 1] || '') + ' ' + block;
+    for (const inv in invoiceBlocks) {
+      const invDate   = invoiceBlocks[inv].date;
+      const blockText = invoiceBlocks[inv].text;
+
+      // Invoice total: Netamount 21,742.10
+      let invoiceTotal = '';
+      const totalMatch = blockText.match(/Netamount\s+([\d.,]+)/i);
+      if (totalMatch) {
+        const raw = totalMatch[1];
+        const val = parseNum(raw);
+        invoiceTotal = isFinite(val) ? val.toFixed(2) : raw;
       }
 
-      // Net amount (invoice total)
-      let invoiceTotal = '';
-      const totalMatch = block.match(/Net\s*amount\s+([\d.,]+)/i);
-      if (totalMatch) invoiceTotal = totalMatch[1];
-
-      // Net Weight
+      // Net weight: Net Weight 78.000 KG
       let invoiceNetWeight = '';
-      const netWMatch = block.match(/Net\s*Weight\s+([\d.,]+)\s*KG/i);
-      if (netWMatch) invoiceNetWeight = netWMatch[1];
+      const netWMatch = blockText.match(/Net\s*Weight\s+([\d.,]+)\s*KG/i);
+      if (netWMatch) {
+        const rawNW = netWMatch[1];
+        const valNW = parseNum(rawNW);
+        invoiceNetWeight = isFinite(valNW) ? valNW.toFixed(3) : rawNW;
+      }
 
-      // Metals: Steel / Aluminum / Copper
+      // Metals: Steel / Aluminum / Copper content 100%: X,XX kg
       let steelTotalKg = 0;
       let aluminumTotalKg = 0;
       let copperTotalKg = 0;
@@ -410,7 +433,7 @@
       const metalRegex =
         /(Steel|Aluminum|Copper)\s+content\s*100%:\s*([\d.,]+)\s*kg/gi;
       let mm;
-      while ((mm = metalRegex.exec(block)) !== null) {
+      while ((mm = metalRegex.exec(blockText)) !== null) {
         const kind = (mm[1] || '').toLowerCase();
         const raw  = mm[2] || '';
         const val  = parseNum(raw);
@@ -424,13 +447,12 @@
       const aluminumStr = aluminumTotalKg? aluminumTotalKg.toFixed(3) : '';
       const copperStr   = copperTotalKg  ? copperTotalKg.toFixed(3)   : '';
 
-      const lineMatches = [...block.matchAll(linePattern)];
-
-      if (!lineMatches.length) {
-        // Fallback so invoice header still appears
+      const matches = [...blockText.matchAll(linePattern)];
+      if (!matches.length) {
+        // Fallback row so invoice header still appears
         allData.push({
-          invoice_number: inv.invoice_number,
-          invoice_date:   inv.invoice_date,
+          invoice_number: inv,
+          invoice_date:   invDate,
           invoice_total:  invoiceTotal,
           supplier:       'Eisenmann GmbH',
           position: '',
@@ -446,19 +468,20 @@
           aluminum_kg: aluminumStr,
           copper_kg:  copperStr
         });
-        return;
+        continue;
       }
 
-      lineMatches.forEach(lm => {
-        const position   = lm[1];
-        const material   = lm[2];
-        const qty        = lm[3];
-        const unit1      = lm[4] || 'PC';
-        const priceEach  = lm[5];
-        const lineTotal  = lm[8];
+      matches.forEach(lm => {
+        const matchObj = lm;
+        const position   = matchObj[1];
+        const material   = matchObj[2];
+        const qty        = matchObj[3];
+        const unit1      = matchObj[4] || 'PC';
+        const priceEach  = matchObj[5];
+        const lineTotal  = matchObj[8];
 
-        const itemStart = lm.index || 0;
-        const itemSection = block.slice(itemStart);
+        const itemStart = matchObj.index || 0;
+        const itemSection = blockText.slice(itemStart);
 
         let hts = '';
         const htsMatch =
@@ -474,8 +497,8 @@
         }
 
         allData.push({
-          invoice_number: inv.invoice_number,
-          invoice_date:   inv.invoice_date,
+          invoice_number: inv,
+          invoice_date:   invDate,
           invoice_total:  invoiceTotal,
           supplier:       'Eisenmann GmbH',
           position:       position,
@@ -492,9 +515,9 @@
           copper_kg:      copperStr
         });
       });
-    });
+    }
 
-    invoiceOrder = [...new Set(allData.map(r => r.invoice_number))];
+    invoiceOrder = Object.keys(invoiceBlocks);
   }
 
   // ===== UI SETUP / RENDERING =====
@@ -606,9 +629,9 @@
       statSupplier.value = rows[0].supplier || 'Eisenmann GmbH';
       statItems.textContent = rows.length;
       statTotal.value    = rows[0].invoice_total || '';
-      statSteel.textContent  = rows[0].steel_kg   || (rows[0].steel_kg === 0 ? '0' : '-');
-      statAlum.textContent   = rows[0].aluminum_kg|| (rows[0].aluminum_kg === 0 ? '0' : '-');
-      statCopper.textContent = rows[0].copper_kg  || (rows[0].copper_kg === 0 ? '0' : '-');
+      statSteel.textContent  = rows[0].steel_kg    || '-';
+      statAlum.textContent   = rows[0].aluminum_kg || '-';
+      statCopper.textContent = rows[0].copper_kg   || '-';
     } else {
       statDate.value = '';
       statSupplier.value = '';
@@ -626,7 +649,7 @@
     });
     statSum.textContent = '$' + sum.toFixed(2);
 
-    const invTotal = parseFloatSafe(rows[0]?.invoice_total || '');
+    const invTotal = parseNum(rows[0]?.invoice_total || '');
     statDiff.classList.remove('success','error');
 
     if (isNaN(invTotal)) {
