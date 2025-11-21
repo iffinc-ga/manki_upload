@@ -125,7 +125,7 @@
     </div>
     <div class="stat">
       <div class="stat-label">Difference</div>
-      <div class="stat-value" id="statDiff">$0.00</div>
+      <div class="stat-value" id="statDiff"></div>
     </div>
   </div>
 
@@ -160,12 +160,10 @@
 </div>
 
 <script>
-  // ========= PDF.JS CONFIG =========
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  // ========= GLOBAL STATE =========
-  let allData = [];       // all line items for all invoices
+  let allData = [];
   let currentInvoice = '';
   let invoiceOrder = [];
   let uploadedPdfName = '';
@@ -183,7 +181,6 @@
   const headerWrap  = document.querySelector('.table-header-wrapper');
   const bodyWrap    = document.querySelector('.table-body-wrapper');
 
-  // Keep header/body scroll in sync
   if (headerWrap && bodyWrap) {
     let syncing = false;
     bodyWrap.addEventListener('scroll', () => {
@@ -194,7 +191,6 @@
     });
   }
 
-  // ========= HELPERS =========
   function showAlert(msg, type='success') {
     alertBox.textContent = msg;
     alertBox.style.display = 'block';
@@ -217,13 +213,11 @@
     return isNaN(n) ? NaN : n;
   }
 
-  // robust EU/US number parsing
   function parseNum(s){
     if (s == null) return NaN;
     const t = String(s).trim();
     if (!t) return NaN;
 
-    // 1.234,56 or 1,234.56
     if (/\d+[.,]\d{3}[.,]\d{2}$/.test(t)) {
       const lastDot = t.lastIndexOf('.');
       const lastComma = t.lastIndexOf(',');
@@ -234,7 +228,6 @@
         return parseFloat(t.replace(/,/g,''));
       }
     }
-    // 1234,56
     if (/,\d{2}$/.test(t) && !/\.\d{2}$/.test(t)) {
       return parseFloat(t.replace(/\./g,'').replace(',', '.'));
     }
@@ -250,7 +243,6 @@
     return '';
   }
 
-  // ========= UNDO =========
   function pushUndo() {
     undoStack.push(JSON.parse(JSON.stringify(allData)));
     if (undoStack.length > 50) undoStack.shift();
@@ -275,7 +267,6 @@
     showAlert('Last change undone.', 'success');
   }
 
-  // ========= FILE HANDLING =========
   function isPdfFile(file) {
     const nameOk = (file.name || '').toLowerCase().endsWith('.pdf');
     const typeOk = (file.type || '').toLowerCase() === 'application/pdf';
@@ -318,17 +309,11 @@
 
       let fullText = '';
       for (let i = 1; i <= pdf.numPages; i++) {
-        try {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent({ includeMarkedContent: true });
-          const items = (textContent && Array.isArray(textContent.items)) ? textContent.items : [];
-          const pageText = items
-            .map(it => (it && typeof it.str === 'string') ? it.str : '')
-            .join(' ');
-          fullText += pageText + '\n';
-        } catch (perPageErr) {
-          console.warn('Failed to read page', i, perPageErr);
-        }
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent({ includeMarkedContent: true });
+        const items = (textContent && Array.isArray(textContent.items)) ? textContent.items : [];
+        const pageText = items.map(it => (it && typeof it.str === 'string') ? it.str : '').join(' ');
+        fullText += pageText + '\n';
       }
 
       if (!fullText.trim()) {
@@ -356,15 +341,13 @@
     }
   }
 
-  // ========= CORE PARSER (EISENMANN) =========
   function parseInvoices(text) {
     allData = [];
     invoiceOrder = [];
     text = String(text || '');
 
-    // Handles "Invoice no. / Date:" and "Invoice no. / Datum:"
     const invoicePattern =
-      /Invoice\s*no\.\s*\/\s*(?:Date|Datum):\s*(\d+)\s*\/\s*(\d{2}\/\d{2}\/\d{4})/g;
+      /Invoice\s*no\.\s*\/\s*(?:Date|Datum):\s*([0-9]+)\s*\/\s*(\d{2}\/\d{2}\/\d{4})/g;
 
     const headers = [];
     let m;
@@ -373,8 +356,7 @@
     while ((m = invoicePattern.exec(text)) !== null) {
       const invNum = m[1];
       const invDate = m[2];
-      // skip duplicate header on page 2 (same invoice)
-      if (invNum === lastInv) continue;
+      if (invNum === lastInv) continue; // skip duplicate headers on page 2
       headers.push({
         index: m.index,
         invoice_number: invNum,
@@ -382,11 +364,8 @@
       });
       lastInv = invNum;
     }
-    // Sentinel
     headers.push({ index: text.length, invoice_number: null, invoice_date: null });
 
-    // Example line:
-    // 000010 F000172334 3 PC 140.64 USD 1 PC 421.91
     const linePattern =
       /(\d{5,6})\s+([A-Z0-9]+)\s+(\d+)\s*(PC)?\s+([\d.,]+)\s+USD\s+(\d+)\s*(PC)?\s+([\d.,]+)/g;
 
@@ -399,17 +378,17 @@
       if (!invNum) continue;
       const block = text.slice(startIdx, endIdx);
 
-      // Invoice total: "Net amount 4,398.92"
+      // Invoice total: "Netamount 4,398.92" or "Net amount 4,398.92"
       let invoiceTotal = '';
       const totalMatch = block.match(/Net\s*amount\s+([\d.,]+)/i);
       if (totalMatch) invoiceTotal = totalMatch[1];
 
-      // Invoice net weight: "Net Weight 78.000 KG"
+      // Net Weight: "Net Weight 78.000 KG"
       let invoiceNetWeight = '';
       const netWMatch = block.match(/Net\s*Weight\s+([\d.,]+)\s*KG/i);
       if (netWMatch) invoiceNetWeight = netWMatch[1];
 
-      // Metal content totals: "Steel content 100%: 11,4 kg" etc.
+      // Metals: "Steel content 100%: 47,2 kg", etc.
       let steelTotalKg = 0;
       let aluminumTotalKg = 0;
       let copperTotalKg = 0;
@@ -434,7 +413,6 @@
       const lineMatches = [...block.matchAll(linePattern)];
 
       if (!lineMatches.length) {
-        // Fallback row so invoice header still appears
         allData.push({
           invoice_number: invNum,
           invoice_date:   invDate,
@@ -457,14 +435,13 @@
       }
 
       lineMatches.forEach(lm => {
-        const position   = lm[1]; // 000010
-        const material   = lm[2]; // F000172334
-        const qty        = lm[3]; // 3
+        const position   = lm[1];
+        const material   = lm[2];
+        const qty        = lm[3];
         const unit1      = lm[4] || 'PC';
-        const priceEach  = lm[5]; // 140.64
-        const lineTotal  = lm[8]; // 421.91
+        const priceEach  = lm[5];
+        const lineTotal  = lm[8];
 
-        // Local slice to pick up HTS & COO
         const itemStart = lm.index || 0;
         const itemSection = block.slice(itemStart);
 
@@ -505,7 +482,6 @@
     invoiceOrder = [...new Set(allData.map(r => r.invoice_number))];
   }
 
-  // ========= UI SETUP / RENDERING =========
   function setupInterface() {
     if (!invoiceOrder.length) return;
 
@@ -625,15 +601,20 @@
     });
     statSum.textContent = '$' + sum.toFixed(2);
 
-    let diff = 0;
     const invTotal = parseFloatSafe(rows[0]?.invoice_total || '');
-    if (!isNaN(invTotal)) diff = invTotal - sum;
-
-    statDiff.textContent = '$' + diff.toFixed(2);
     statDiff.classList.remove('success','error');
-    if (!isNaN(invTotal)) {
-      if (Math.abs(diff) < 0.01) statDiff.classList.add('success');
-      else statDiff.classList.add('error');
+
+    if (isNaN(invTotal)) {
+      // no valid invoice total -> leave Difference blank
+      statDiff.textContent = '';
+    } else {
+      const diff = invTotal - sum;
+      statDiff.textContent = '$' + diff.toFixed(2);
+      if (Math.abs(diff) < 0.01) {
+        statDiff.classList.add('success');
+      } else {
+        statDiff.classList.add('error');
+      }
     }
   }
 
@@ -696,7 +677,6 @@
     uploadSec.style.display = 'block';
   }
 
-  // ========= EXPORT TO DESCARTES TEMPLATE =========
   function buildDescartesRow(item) {
     const row = {
       'InvoiceNumber': item.invoice_number || "",
@@ -797,7 +777,6 @@
       return;
     }
 
-    // Sort by invoice then position (numeric, then A/B suffix)
     const items = allData.slice().sort((a,b) => {
       const ai = String(a.invoice_number || '');
       const bi = String(b.invoice_number || '');
