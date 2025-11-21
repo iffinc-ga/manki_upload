@@ -1,513 +1,824 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tariff Code Mapping Tool</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .container {
-            background: white;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 800px;
-            width: 100%;
-        }
-        
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-        }
-        
-        .subtitle {
-            color: #666;
-            margin-bottom: 30px;
-            font-size: 14px;
-        }
-        
-        .upload-section {
-            background: #f8f9fa;
-            border: 2px dashed #dee2e6;
-            border-radius: 12px;
-            padding: 30px;
-            text-align: center;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
-        }
-        
-        .upload-section:hover {
-            border-color: #667eea;
-            background: #f0f1ff;
-        }
-        
-        .upload-section.dragover {
-            border-color: #667eea;
-            background: #e8eaff;
-        }
-        
-        input[type="file"] {
-            display: none;
-        }
-        
-        .upload-label {
-            display: inline-block;
-            padding: 12px 30px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: transform 0.2s;
-        }
-        
-        .upload-label:hover {
-            transform: translateY(-2px);
-        }
-        
-        .file-info {
-            margin-top: 15px;
-            color: #495057;
-            font-size: 14px;
-        }
-        
-        .process-btn {
-            width: 100%;
-            padding: 15px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 20px;
-        }
-        
-        .process-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-        }
-        
-        .process-btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-        
-        .status {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            display: none;
-        }
-        
-        .status.success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .status.error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .status.info {
-            background: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        
-        .results {
-            margin-top: 20px;
-        }
-        
-        .stat-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        
-        .stat-card {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 20px;
-            border-radius: 8px;
-            text-align: center;
-            color: white;
-        }
-        
-        .stat-number {
-            font-size: 32px;
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        
-        .stat-label {
-            font-size: 12px;
-            opacity: 0.9;
-        }
-        
-        .download-btn {
-            width: 100%;
-            padding: 15px;
-            background: #28a745;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-        
-        .download-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
-        }
-        
-        .instructions {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            font-size: 14px;
-            color: #856404;
-        }
-        
-        .instructions h3 {
-            margin-bottom: 10px;
-            color: #856404;
-        }
-        
-        .instructions ul {
-            margin-left: 20px;
-        }
-        
-        .instructions li {
-            margin-bottom: 5px;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 20px;
-            color: #666;
-        }
-
-        .spinner {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 20px auto;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>Eisenmann Invoice PDF Parser</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial, sans-serif;background:#f5f7fa;padding:20px}
+    .container{max-width:1800px;margin:0 auto;background:#fff;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+    .header{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:30px;border-radius:8px 8px 0 0}
+    .header h1{margin-bottom:8px}
+    .upload-section{padding:40px;text-align:center}
+    .upload-box{border:3px dashed #cbd5e0;border-radius:8px;padding:40px;cursor:pointer;transition:.3s}
+    .upload-box:hover{border-color:#667eea;background:#f7fafc}
+    .upload-box.dragover{border-color:#667eea;background:#e6f0ff}
+    #fileInput{display:none}
+    .loading{padding:40px;text-align:center;display:none}
+    .spinner{border:4px solid #f3f3f3;border-top:4px solid #667eea;border-radius:50%;width:50px;height:50px;animation:spin 1s linear infinite;margin:0 auto 20px}
+    @keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
+    .controls{padding:20px;background:#f8f9fa;border-bottom:1px solid #dee2e6;display:none;position:sticky;top:0;z-index:100;align-items:center;gap:10px;flex-wrap:wrap}
+    .controls select{padding:10px;border:1px solid #ced4da;border-radius:4px;font-size:14px;min-width:260px}
+    .controls button{padding:10px 20px;border:none;border-radius:4px;font-weight:600;cursor:pointer}
+    .btn-success{background:#28a745;color:#fff}.btn-success:hover{background:#218838}
+    .btn-primary{background:#007bff;color:#fff}.btn-primary:hover{background:#0056b3}
+    .btn-danger{background:#dc3545;color:#fff}.btn-danger:hover{background:#c82333}
+    .btn-light{background:#f8f9fa;color:#212529;border:1px solid #ced4da}
+    .inline-help{font-size:12px;color:#6c757d;margin-left:8px}
+    .stats{padding:20px;display:none;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:15px;background:#fff3cd}
+    .stat{padding:15px;background:#fff;border-radius:4px;border-left:4px solid #ffc107}
+    .stat-label{font-size:11px;color:#6c757d;text-transform:uppercase;margin-bottom:5px}
+    .stat-value{font-size:20px;font-weight:700}
+    .stat-value.error{color:#dc3545}.stat-value.success{color:#28a745}
+    .stat input{width:100%;padding:6px;border:1px solid #ced4da;border-radius:3px;font-size:16px;font-weight:bold}
+    .stat.editable{border-left-color:#007bff}
+    .table-container{padding:20px;display:none}
+    .table-header-wrapper{background:#343a40;overflow:auto}
+    .table-header-wrapper::-webkit-scrollbar{display:none}
+    .table-header-wrapper{scrollbar-width:none}
+    .table-header{min-width:1100px}
+    .table-header table{width:100%;border-collapse:collapse}
+    .table-header th{background:#343a40;color:#fff;padding:8px;text-align:left;font-weight:600;font-size:13px;border:none}
+    .table-body-wrapper{max-height:560px;overflow:auto}
+    .table-body{min-width:1100px}
+    .table-body table{width:100%;border-collapse:collapse}
+    .table-body td{padding:6px 6px;border-bottom:1px solid #dee2e6;background:#fff}
+    .table-body tr:hover td{background:#f8f9fa}
+    .table-body td input{width:100%;padding:6px;border:1px solid #ced4da;border-radius:3px;font-size:13px}
+    .table-body td input:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 2px rgba(102,126,234,.15)}
+    .readonly{background:#e9ecef!important}
+    .actions{text-align:center;white-space:nowrap}
+    .actions button{padding:4px 8px;font-size:11px;margin:0 2px}
+    .alert{margin:0 20px 20px;border-radius:4px;padding:10px 14px;font-size:13px;display:none}
+    .table-header table,.table-body table{table-layout:fixed}
+    .table-header th:nth-child(1),.table-body td:nth-child(1){width:52px!important}
+    .table-header th:nth-child(2),.table-body td:nth-child(2){width:190px!important}
+    .table-header th:nth-child(3),.table-body td:nth-child(3){width:80px!important}
+    .table-header th:nth-child(4),.table-body td:nth-child(4){width:60px!important}
+    .table-header th:nth-child(5),.table-body td:nth-child(5){width:110px!important}
+    .table-header th:nth-child(6),.table-body td:nth-child(6){width:110px!important}
+    .table-header th:nth-child(7),.table-body td:nth-child(7){width:110px!important}
+    .table-header th:nth-child(8),.table-body td:nth-child(8){width:110px!important}
+    .table-header th:nth-child(9),.table-body td:nth-child(9){width:110px!important}
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🔄 Tariff Code Mapping Tool</h1>
-        <p class="subtitle">Upload OneView Excel file to populate IES template</p>
-        
-        <div id="loadingMessage" class="loading">
-            <div class="spinner"></div>
-            <p>Loading reference files...</p>
-        </div>
+<div class="container">
+  <div class="header">
+    <h1>📄 Eisenmann Invoice PDF Parser</h1>
+    <p>Parse Eisenmann customs invoices into editable line items and export to Descartes template.</p>
+  </div>
 
-        <div id="mainContent" style="display: none;">
-            <div class="instructions">
-                <h3>How it works:</h3>
-                <ul>
-                    <li>Upload your OneView Excel file</li>
-                    <li>Non-base tariffs (starting with 98/99) go in TariffNumber</li>
-                    <li>Base tariffs populate Secondary/Third/etc. TariffNumbers with NetWeight (L)</li>
-                    <li>Download the populated template</li>
-                </ul>
-            </div>
-            
-            <div class="upload-section" id="uploadSection">
-                <label for="fileInput" class="upload-label">
-                    📁 Choose OneView File
-                </label>
-                <input type="file" id="fileInput" accept=".xlsx,.xls" />
-                <div class="file-info" id="fileInfo">No file selected</div>
-            </div>
-            
-            <button class="process-btn" id="processBtn" disabled>Process File</button>
-            
-            <div class="status" id="status"></div>
-            
-            <div class="results" id="results" style="display: none;">
-                <div class="stat-grid">
-                    <div class="stat-card">
-                        <div class="stat-number" id="totalRows">0</div>
-                        <div class="stat-label">Total Rows</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="matchedRows">0</div>
-                        <div class="stat-label">Matched</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-number" id="unmatchedRows">0</div>
-                        <div class="stat-label">Unmatched</div>
-                    </div>
-                </div>
-                <button class="download-btn" id="downloadBtn">⬇️ Download Populated Template</button>
-            </div>
-        </div>
+  <div class="upload-section" id="uploadSection">
+    <div class="upload-box" id="uploadBox">
+      <h2>📤 Upload Eisenmann PDF</h2>
+      <p style="margin-top:10px;color:#6c757d">Click or drag &amp; drop your multi-invoice PDF here</p>
+      <input type="file" id="fileInput" accept=".pdf,application/pdf" />
     </div>
+  </div>
 
-    <script>
-        // Configuration - Update these paths to match your GitHub repository structure
-        const CONFIG = {
-            MANKI_DB_PATH: 'updated_manki_db.xlsx',
-            TEMPLATE_PATH: 'ies_upload_template.xlsx'
-        };
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <div><strong>Processing PDF...</strong></div>
+  </div>
 
-        let oneviewData = null;
-        let mankiDbData = null;
-        let templateHeaders = null;
-        let processedWorkbook = null;
+  <div class="alert" id="alert"></div>
 
-        // Load reference files from the repository
-        async function loadReferenceFiles() {
-            try {
-                // Load manki_db
-                const mankiResponse = await fetch(CONFIG.MANKI_DB_PATH);
-                if (!mankiResponse.ok) throw new Error('Failed to load Manki DB file');
-                const mankiArrayBuffer = await mankiResponse.arrayBuffer();
-                const mankiWorkbook = XLSX.read(mankiArrayBuffer);
-                mankiDbData = XLSX.utils.sheet_to_json(mankiWorkbook.Sheets[mankiWorkbook.SheetNames[0]]);
-                
-                // Load template
-                const templateResponse = await fetch(CONFIG.TEMPLATE_PATH);
-                if (!templateResponse.ok) throw new Error('Failed to load template file');
-                const templateArrayBuffer = await templateResponse.arrayBuffer();
-                const templateWorkbook = XLSX.read(templateArrayBuffer);
-                const templateSheet = templateWorkbook.Sheets[templateWorkbook.SheetNames[0]];
-                const range = XLSX.utils.decode_range(templateSheet['!ref']);
-                
-                templateHeaders = [];
-                for (let col = range.s.c; col <= range.e.c; col++) {
-                    const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col });
-                    const cell = templateSheet[cellAddress];
-                    if (cell && cell.v) {
-                        templateHeaders.push(cell.v);
-                    }
-                }
-                
-                // Hide loading message and show main content
-                document.getElementById('loadingMessage').style.display = 'none';
-                document.getElementById('mainContent').style.display = 'block';
-                showStatus('Reference files loaded successfully. Ready to process OneView files.', 'success');
-            } catch (error) {
-                document.getElementById('loadingMessage').innerHTML = 
-                    `<p style="color: #721c24;">Error loading reference files: ${error.message}</p>
-                     <p style="color: #721c24; font-size: 12px; margin-top: 10px;">
-                     Make sure 'updated_manki_db.xlsx' and 'ies_upload_template.xlsx' are in the same directory as this HTML file.
-                     </p>`;
-            }
+  <div class="controls" id="controls">
+    <select id="invoiceSelect"><option value="">Select an invoice...</option></select>
+    <button class="btn-success" onclick="exportToDescartes()">📊 Export (All Invoices) to Descartes Excel</button>
+    <button class="btn-light" onclick="undoLast()">↩️ Undo last change</button>
+    <button class="btn-primary" onclick="resetUpload()">📤 New Upload</button>
+    <span class="inline-help">Use Tab / Shift+Tab to move across cells. Edit invoice totals/dates at the top.</span>
+  </div>
+
+  <div class="stats" id="stats">
+    <div class="stat">
+      <div class="stat-label">Invoice Number</div>
+      <div class="stat-value" id="statInvoice">-</div>
+    </div>
+    <div class="stat editable">
+      <div class="stat-label">Invoice Date (Editable)</div>
+      <input autocomplete="off" type="text" id="statDate" placeholder="MM/DD/YYYY"
+             onchange="updateInvoiceField('invoice_date', this.value)">
+    </div>
+    <div class="stat editable">
+      <div class="stat-label">Supplier (Editable)</div>
+      <input autocomplete="off" type="text" id="statSupplier" placeholder="Supplier name"
+             onchange="updateInvoiceField('supplier', this.value)">
+    </div>
+    <div class="stat">
+      <div class="stat-label">Total Line Items</div>
+      <div class="stat-value" id="statItems">0</div>
+    </div>
+    <div class="stat editable">
+      <div class="stat-label">Invoice Total (Editable)</div>
+      <input autocomplete="off" type="number" step="0.01" id="statTotal" placeholder="0.00"
+             onchange="updateInvoiceTotal(this.value)">
+    </div>
+    <div class="stat">
+      <div class="stat-label">Line Items Sum</div>
+      <div class="stat-value" id="statSum">$0.00</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Difference</div>
+      <div class="stat-value" id="statDiff">$0.00</div>
+    </div>
+  </div>
+
+  <div class="table-container" id="tableContainer">
+    <div class="table-header-wrapper">
+      <div class="table-header">
+        <table>
+          <thead>
+          <tr>
+            <th>Pos</th>
+            <th>Material / Part #</th>
+            <th>Quantity</th>
+            <th>Unit</th>
+            <th>Unit Price</th>
+            <th>Line Total</th>
+            <th>Net Weight (per line)</th>
+            <th>Country</th>
+            <th>Actions</th>
+          </tr>
+          </thead>
+        </table>
+      </div>
+    </div>
+    <div class="table-body-wrapper">
+      <div class="table-body">
+        <table>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ========= PDF.JS CONFIG =========
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  // ========= GLOBAL STATE =========
+  let allData = [];       // all line items for all invoices
+  let currentInvoice = '';
+  let invoiceOrder = [];
+  let uploadedPdfName = '';
+  let undoStack = [];
+
+  const uploadBox   = document.getElementById('uploadBox');
+  const fileInput   = document.getElementById('fileInput');
+  const loadingPane = document.getElementById('loading');
+  const uploadSec   = document.getElementById('uploadSection');
+  const alertBox    = document.getElementById('alert');
+  const controls    = document.getElementById('controls');
+  const stats       = document.getElementById('stats');
+  const tableCont   = document.getElementById('tableContainer');
+  const invoiceSelect = document.getElementById('invoiceSelect');
+  const headerWrap  = document.querySelector('.table-header-wrapper');
+  const bodyWrap    = document.querySelector('.table-body-wrapper');
+
+  // Keep header/body scroll in sync
+  if (headerWrap && bodyWrap) {
+    let syncing = false;
+    bodyWrap.addEventListener('scroll', () => {
+      if (syncing) return;
+      syncing = true;
+      headerWrap.scrollLeft = bodyWrap.scrollLeft;
+      syncing = false;
+    });
+  }
+
+  // ========= HELPERS =========
+  function showAlert(msg, type='success') {
+    alertBox.textContent = msg;
+    alertBox.style.display = 'block';
+    if (type === 'error') {
+      alertBox.style.background = '#f8d7da';
+      alertBox.style.color = '#721c24';
+      alertBox.style.border = '1px solid #f5c6cb';
+    } else {
+      alertBox.style.background = '#d4edda';
+      alertBox.style.color = '#155724';
+      alertBox.style.border = '1px solid #c3e6cb';
+    }
+    setTimeout(() => { alertBox.style.display = 'none'; }, 4000);
+  }
+
+  function parseFloatSafe(v) {
+    if (v == null) return NaN;
+    const t = String(v).replace(/,/g, '').trim();
+    const n = parseFloat(t);
+    return isNaN(n) ? NaN : n;
+  }
+
+  // robust EU/US number parsing
+  function parseNum(s){
+    if (s == null) return NaN;
+    const t = String(s).trim();
+    if (!t) return NaN;
+
+    // 1.234,56 or 1,234.56
+    if (/\d+[.,]\d{3}[.,]\d{2}$/.test(t)) {
+      const lastDot = t.lastIndexOf('.');
+      const lastComma = t.lastIndexOf(',');
+      const decSep = (lastComma > lastDot) ? ',' : '.';
+      if (decSep === ',') {
+        return parseFloat(t.replace(/\./g,'').replace(',', '.'));
+      } else {
+        return parseFloat(t.replace(/,/g,''));
+      }
+    }
+    // 1234,56
+    if (/,\d{2}$/.test(t) && !/\.\d{2}$/.test(t)) {
+      return parseFloat(t.replace(/\./g,'').replace(',', '.'));
+    }
+    return parseFloat(t.replace(/,/g,''));
+  }
+
+  function computeExportUnitPrice(item){
+    const q = parseNum(item.quantity);
+    const t = parseNum(item.line_total);
+    if (isFinite(q) && q > 0 && isFinite(t)) {
+      return (t / q).toFixed(6);
+    }
+    return '';
+  }
+
+  // ========= UNDO =========
+  function pushUndo() {
+    undoStack.push(JSON.parse(JSON.stringify(allData)));
+    if (undoStack.length > 50) undoStack.shift();
+  }
+
+  function undoLast() {
+    if (!undoStack.length) {
+      showAlert('Nothing to undo', 'error');
+      return;
+    }
+    allData = undoStack.pop() || [];
+    invoiceOrder = [...new Set(allData.map(r => r.invoice_number))];
+    if (!invoiceOrder.length) {
+      tableCont.style.display = 'none';
+      stats.style.display = 'none';
+      return;
+    }
+    if (!currentInvoice || !invoiceOrder.includes(currentInvoice)) {
+      currentInvoice = invoiceOrder[0] || '';
+    }
+    loadInvoiceData();
+    showAlert('Last change undone.', 'success');
+  }
+
+  // ========= FILE HANDLING =========
+  function isPdfFile(file) {
+    const nameOk = (file.name || '').toLowerCase().endsWith('.pdf');
+    const typeOk = (file.type || '').toLowerCase() === 'application/pdf';
+    return nameOk || typeOk;
+  }
+
+  uploadBox.addEventListener('click', () => fileInput.click());
+  fileInput.addEventListener('change', e => {
+    const f = e.target.files && e.target.files[0];
+    if (f) handleFile(f);
+  });
+
+  uploadBox.addEventListener('dragover', e => {
+    e.preventDefault();
+    uploadBox.classList.add('dragover');
+  });
+  uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
+  uploadBox.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadBox.classList.remove('dragover');
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleFile(f);
+  });
+
+  async function handleFile(file) {
+    if (!isPdfFile(file)) {
+      showAlert('Please upload a PDF file.', 'error');
+      return;
+    }
+    uploadedPdfName = (file.name || '').replace(/\.pdf$/i, '');
+    undoStack = [];
+
+    uploadSec.style.display = 'none';
+    loadingPane.style.display = 'block';
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
+
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        try {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent({ includeMarkedContent: true });
+          const items = (textContent && Array.isArray(textContent.items)) ? textContent.items : [];
+          const pageText = items
+            .map(it => (it && typeof it.str === 'string') ? it.str : '')
+            .join(' ');
+          fullText += pageText + '\n';
+        } catch (perPageErr) {
+          console.warn('Failed to read page', i, perPageErr);
         }
+      }
 
-        // File upload handling
-        const fileInput = document.getElementById('fileInput');
-        const uploadSection = document.getElementById('uploadSection');
-        const fileInfo = document.getElementById('fileInfo');
-        const processBtn = document.getElementById('processBtn');
+      if (!fullText.trim()) {
+        showAlert('The PDF had no extractable text (might be scanned).', 'error');
+        uploadSec.style.display = 'block';
+        return;
+      }
 
-        fileInput.addEventListener('change', handleFileSelect);
-        
-        uploadSection.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadSection.classList.add('dragover');
+      parseInvoices(fullText);
+
+      if (allData.length) {
+        const invoiceCount = new Set(allData.map(d => d.invoice_number)).size;
+        showAlert(`Parsed ${invoiceCount} invoice(s) and ${allData.length} line item(s).`, 'success');
+        setupInterface();
+      } else {
+        showAlert('No Eisenmann invoice lines were found in the PDF.', 'error');
+        uploadSec.style.display = 'block';
+      }
+    } catch (err) {
+      console.error('PDF processing error:', err);
+      showAlert('Error processing PDF: ' + (err.message || String(err)), 'error');
+      uploadSec.style.display = 'block';
+    } finally {
+      loadingPane.style.display = 'none';
+    }
+  }
+
+  // ========= CORE PARSER (EISENMANN) =========
+  function parseInvoices(text) {
+    allData = [];
+    invoiceOrder = [];
+    text = String(text || '');
+
+    // Handles "Invoice no. / Date:" and "Invoice no. / Datum:"
+    const invoicePattern =
+      /Invoice\s*no\.\s*\/\s*(?:Date|Datum):\s*(\d+)\s*\/\s*(\d{2}\/\d{2}\/\d{4})/g;
+
+    const headers = [];
+    let m;
+    let lastInv = null;
+
+    while ((m = invoicePattern.exec(text)) !== null) {
+      const invNum = m[1];
+      const invDate = m[2];
+      // skip duplicate header on page 2 (same invoice)
+      if (invNum === lastInv) continue;
+      headers.push({
+        index: m.index,
+        invoice_number: invNum,
+        invoice_date: invDate
+      });
+      lastInv = invNum;
+    }
+    // Sentinel
+    headers.push({ index: text.length, invoice_number: null, invoice_date: null });
+
+    // Example line:
+    // 000010 F000172334 3 PC 140.64 USD 1 PC 421.91
+    const linePattern =
+      /(\d{5,6})\s+([A-Z0-9]+)\s+(\d+)\s*(PC)?\s+([\d.,]+)\s+USD\s+(\d+)\s*(PC)?\s+([\d.,]+)/g;
+
+    for (let i = 0; i < headers.length - 1; i++) {
+      const startIdx = headers[i].index;
+      const endIdx   = headers[i + 1].index;
+      const invNum   = headers[i].invoice_number;
+      const invDate  = headers[i].invoice_date;
+
+      if (!invNum) continue;
+      const block = text.slice(startIdx, endIdx);
+
+      // Invoice total: "Net amount 4,398.92"
+      let invoiceTotal = '';
+      const totalMatch = block.match(/Net\s*amount\s+([\d.,]+)/i);
+      if (totalMatch) invoiceTotal = totalMatch[1];
+
+      // Invoice net weight: "Net Weight 78.000 KG"
+      let invoiceNetWeight = '';
+      const netWMatch = block.match(/Net\s*Weight\s+([\d.,]+)\s*KG/i);
+      if (netWMatch) invoiceNetWeight = netWMatch[1];
+
+      // Metal content totals: "Steel content 100%: 11,4 kg" etc.
+      let steelTotalKg = 0;
+      let aluminumTotalKg = 0;
+      let copperTotalKg = 0;
+
+      const metalRegex =
+        /(Steel|Aluminum|Copper)\s+content\s*100%:\s*([\d.,]+)\s*kg/gi;
+      let mm;
+      while ((mm = metalRegex.exec(block)) !== null) {
+        const kind = (mm[1] || '').toLowerCase();
+        const raw  = mm[2] || '';
+        const val  = parseNum(raw);
+        if (!isFinite(val)) continue;
+        if (kind === 'steel') steelTotalKg += val;
+        else if (kind === 'aluminum') aluminumTotalKg += val;
+        else if (kind === 'copper') copperTotalKg += val;
+      }
+
+      const steelStr    = steelTotalKg   ? steelTotalKg.toFixed(3)    : '';
+      const aluminumStr = aluminumTotalKg? aluminumTotalKg.toFixed(3) : '';
+      const copperStr   = copperTotalKg  ? copperTotalKg.toFixed(3)   : '';
+
+      const lineMatches = [...block.matchAll(linePattern)];
+
+      if (!lineMatches.length) {
+        // Fallback row so invoice header still appears
+        allData.push({
+          invoice_number: invNum,
+          invoice_date:   invDate,
+          invoice_total:  invoiceTotal,
+          supplier:       'Eisenmann GmbH',
+          position: '',
+          part_number: '',
+          quantity: '',
+          unit: 'PC',
+          unit_price: '',
+          line_total: '',
+          net_weight: invoiceNetWeight || '',
+          country_of_origin: '',
+          hts_code: '',
+          steel_kg:   steelStr,
+          aluminum_kg: aluminumStr,
+          copper_kg:  copperStr
         });
-        
-        uploadSection.addEventListener('dragleave', () => {
-            uploadSection.classList.remove('dragover');
+        continue;
+      }
+
+      lineMatches.forEach(lm => {
+        const position   = lm[1]; // 000010
+        const material   = lm[2]; // F000172334
+        const qty        = lm[3]; // 3
+        const unit1      = lm[4] || 'PC';
+        const priceEach  = lm[5]; // 140.64
+        const lineTotal  = lm[8]; // 421.91
+
+        // Local slice to pick up HTS & COO
+        const itemStart = lm.index || 0;
+        const itemSection = block.slice(itemStart);
+
+        let hts = '';
+        const htsMatch =
+          itemSection.match(/Commodity\s*Code\s*\/\s*Import\s*Code\s*Number:\s*([0-9]+)/i);
+        if (htsMatch) hts = htsMatch[1];
+
+        let coo = '';
+        const cooMatch =
+          itemSection.match(/Country\s+of\s+origin:\s*([A-Za-z]+)/i);
+        if (cooMatch) {
+          coo = cooMatch[1].trim();
+          if (coo.toLowerCase().startsWith('germany')) coo = 'DE';
+        }
+
+        allData.push({
+          invoice_number: invNum,
+          invoice_date:   invDate,
+          invoice_total:  invoiceTotal,
+          supplier:       'Eisenmann GmbH',
+          position:       position,
+          part_number:    material,
+          quantity:       qty,
+          unit:           unit1,
+          unit_price:     priceEach,
+          line_total:     lineTotal,
+          net_weight:     invoiceNetWeight || '',
+          country_of_origin: coo,
+          hts_code:       hts,
+          steel_kg:       steelStr,
+          aluminum_kg:    aluminumStr,
+          copper_kg:      copperStr
         });
-        
-        uploadSection.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadSection.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) {
-                fileInput.files = e.dataTransfer.files;
-                handleFileSelect();
-            }
-        });
+      });
+    }
 
-        function handleFileSelect() {
-            const file = fileInput.files[0];
-            if (file) {
-                fileInfo.textContent = `Selected: ${file.name}`;
-                processBtn.disabled = false;
-                
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    oneviewData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-                    showStatus(`File loaded: ${oneviewData.length} rows found`, 'info');
-                };
-                reader.readAsArrayBuffer(file);
-            }
+    invoiceOrder = [...new Set(allData.map(r => r.invoice_number))];
+  }
+
+  // ========= UI SETUP / RENDERING =========
+  function setupInterface() {
+    if (!invoiceOrder.length) return;
+
+    controls.style.display = 'flex';
+    stats.style.display = 'grid';
+    tableCont.style.display = 'block';
+
+    invoiceSelect.innerHTML = '<option value="">Select an invoice...</option>';
+    invoiceOrder.forEach(inv => {
+      const opt = document.createElement('option');
+      opt.value = inv;
+      opt.textContent = inv;
+      invoiceSelect.appendChild(opt);
+    });
+
+    currentInvoice = invoiceOrder[0];
+    invoiceSelect.value = currentInvoice;
+    loadInvoiceData();
+  }
+
+  invoiceSelect.addEventListener('change', e => {
+    currentInvoice = e.target.value;
+    loadInvoiceData();
+  });
+
+  function loadInvoiceData() {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+
+    const rows = allData.filter(r => r.invoice_number === currentInvoice);
+    rows.forEach(row => {
+      const globalIdx = allData.indexOf(row);
+      const tr = document.createElement('tr');
+
+      function makeCell(field) {
+        const td = document.createElement('td');
+        const input = document.createElement('input');
+        input.value = row[field] == null ? '' : row[field];
+        input.dataset.index = String(globalIdx);
+        input.dataset.field = field;
+        input.addEventListener('input', onCellChange);
+        if (field === 'position') input.style.textAlign = 'right';
+        if (field === 'quantity' || field === 'unit_price' || field === 'line_total' || field === 'net_weight') {
+          input.style.textAlign = 'right';
         }
+        td.appendChild(input);
+        return td;
+      }
 
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
-        }
+      tr.appendChild(makeCell('position'));
+      tr.appendChild(makeCell('part_number'));
+      tr.appendChild(makeCell('quantity'));
+      tr.appendChild(makeCell('unit'));
+      tr.appendChild(makeCell('unit_price'));
+      tr.appendChild(makeCell('line_total'));
+      tr.appendChild(makeCell('net_weight'));
+      tr.appendChild(makeCell('country_of_origin'));
 
-        function isBaseTariff(tariffNum) {
-            if (!tariffNum) return false;
-            const tariffStr = String(tariffNum).trim();
-            return !tariffStr.startsWith('98') && !tariffStr.startsWith('99');
-        }
+      const tdAct = document.createElement('td');
+      tdAct.className = 'actions';
+      const btnAdd = document.createElement('button');
+      btnAdd.textContent = '+ Below';
+      btnAdd.className = 'btn-light';
+      btnAdd.addEventListener('click', () => { pushUndo(); addRowBelow(globalIdx); });
+      const btnDel = document.createElement('button');
+      btnDel.textContent = 'Delete';
+      btnDel.className = 'btn-danger';
+      btnDel.addEventListener('click', () => { pushUndo(); deleteRow(globalIdx); });
+      tdAct.appendChild(btnAdd);
+      tdAct.appendChild(btnDel);
+      tr.appendChild(tdAct);
 
-        processBtn.addEventListener('click', processData);
+      tbody.appendChild(tr);
+    });
 
-        function processData() {
-            if (!oneviewData || !mankiDbData || !templateHeaders) {
-                showStatus('Missing data. Please ensure all files are loaded.', 'error');
-                return;
-            }
+    updateStats();
+  }
 
-            showStatus('Processing data...', 'info');
-            
-            const outputData = [];
-            let matchedCount = 0;
-            let unmatchedCount = 0;
+  function onCellChange(e) {
+    const idx = parseInt(e.target.dataset.index, 10);
+    const field = e.target.dataset.field;
+    if (Number.isNaN(idx) || !field) return;
+    pushUndo();
+    allData[idx][field] = e.target.value;
+    updateStats();
+  }
 
-            oneviewData.forEach(oneviewRow => {
-                const partNumber = String(oneviewRow.BuyerPartNumber || '').trim();
-                
-                // Find matching row in manki_db
-                const mankiRow = mankiDbData.find(row => 
-                    String(row['PRIMARY PART NUM'] || '').trim() === partNumber
-                );
+  function updateStats() {
+    const rows = allData.filter(r => r.invoice_number === currentInvoice);
 
-                const outputRow = {};
-                
-                // Copy basic fields from oneview
-                templateHeaders.forEach(header => {
-                    if (oneviewRow.hasOwnProperty(header)) {
-                        outputRow[header] = oneviewRow[header];
-                    } else {
-                        outputRow[header] = '';
-                    }
-                });
+    const statInvoice  = document.getElementById('statInvoice');
+    const statDate     = document.getElementById('statDate');
+    const statSupplier = document.getElementById('statSupplier');
+    const statItems    = document.getElementById('statItems');
+    const statTotal    = document.getElementById('statTotal');
+    const statSum      = document.getElementById('statSum');
+    const statDiff     = document.getElementById('statDiff');
 
-                if (mankiRow) {
-                    matchedCount++;
-                    
-                    // Process tariff numbers
-                    const tariffColumns = ['TARIFF NUM', 'TARIFF NUM_1', 'TARIFF NUM_2', 'TARIFF NUM_3', 'TARIFF NUM_4', 'TARIFF NUM_5'];
-                    const allTariffs = [];
-                    
-                    // Collect all tariffs in order
-                    tariffColumns.forEach(col => {
-                        const tariff = mankiRow[col];
-                        if (tariff && String(tariff).trim() !== '') {
-                            allTariffs.push({
-                                value: tariff,
-                                isBase: isBaseTariff(tariff)
-                            });
-                        }
-                    });
-                    
-                    // First tariff (should be non-base) goes to TariffNumber
-                    if (allTariffs.length > 0) {
-                        outputRow['TariffNumber'] = allTariffs[0].value;
-                    }
-                    
-                    // Remaining tariffs go to Secondary, Third, 4, 5, 6, 7, 8
-                    const netWeight = oneviewRow.NetWeight || 0;
-                    const roundedWeight = Math.round(netWeight);
-                    
-                    const tariffMapping = [
-                        { number: 'SecondaryTariffNumber', quantity: 'Secondary Quantity1', unit: 'Secondaryunitofmeasure1' },
-                        { number: 'ThirdTariffNumber', quantity: 'ThirdTariffQuantity1', unit: 'ThirdTariffUnitofMeasure1' },
-                        { number: '4TariffNumber', quantity: '4TariffQuantity1', unit: '4TariffUnitofMeasure1' },
-                        { number: '5TariffNumber', quantity: '5TariffQuantity1', unit: '5TariffUnitofMeasure1' },
-                        { number: '6TariffNumber', quantity: '6TariffQuantity1', unit: '6TariffUnitofMeasure1' },
-                        { number: '7TariffNumber', quantity: '7TariffQuantity1', unit: '7TariffUnitofMeasure1' },
-                        { number: '8TariffNumber', quantity: '8TariffQuantity1', unit: '8TariffUnitofMeasure1' }
-                    ];
-                    
-                    // Process remaining tariffs (starting from index 1)
-                    for (let i = 1; i < allTariffs.length && i <= 7; i++) {
-                        const tariff = allTariffs[i];
-                        const mapping = tariffMapping[i - 1];
-                        
-                        // Set tariff number
-                        outputRow[mapping.number] = tariff.value;
-                        
-                        // If it's a base tariff, add quantity and unit
-                        if (tariff.isBase) {
-                            outputRow[mapping.quantity] = roundedWeight;
-                            outputRow[mapping.unit] = 'L';
-                        }
-                    }
-                } else {
-                    unmatchedCount++;
-                }
+    statInvoice.textContent = currentInvoice || '-';
 
-                outputData.push(outputRow);
-            });
+    if (rows.length) {
+      statDate.value     = rows[0].invoice_date || '';
+      statSupplier.value = rows[0].supplier || 'Eisenmann GmbH';
+      statItems.textContent = rows.length;
+      statTotal.value    = rows[0].invoice_total || '';
+    } else {
+      statDate.value = '';
+      statSupplier.value = '';
+      statItems.textContent = '0';
+      statTotal.value = '';
+    }
 
-            // Create workbook
-            const ws = XLSX.utils.json_to_sheet(outputData, { header: templateHeaders });
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
-            
-            processedWorkbook = wb;
+    let sum = 0;
+    rows.forEach(r => {
+      const v = parseFloatSafe(r.line_total);
+      if (!isNaN(v)) sum += v;
+    });
+    statSum.textContent = '$' + sum.toFixed(2);
 
-            // Update stats
-            document.getElementById('totalRows').textContent = oneviewData.length;
-            document.getElementById('matchedRows').textContent = matchedCount;
-            document.getElementById('unmatchedRows').textContent = unmatchedCount;
-            document.getElementById('results').style.display = 'block';
+    let diff = 0;
+    const invTotal = parseFloatSafe(rows[0]?.invoice_total || '');
+    if (!isNaN(invTotal)) diff = invTotal - sum;
 
-            showStatus(`Processing complete! ${matchedCount} matched, ${unmatchedCount} unmatched`, 'success');
-        }
+    statDiff.textContent = '$' + diff.toFixed(2);
+    statDiff.classList.remove('success','error');
+    if (!isNaN(invTotal)) {
+      if (Math.abs(diff) < 0.01) statDiff.classList.add('success');
+      else statDiff.classList.add('error');
+    }
+  }
 
-        document.getElementById('downloadBtn').addEventListener('click', () => {
-            if (processedWorkbook) {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-                XLSX.writeFile(processedWorkbook, `populated_template_${timestamp}.xlsx`);
-                showStatus('File downloaded successfully!', 'success');
-            }
-        });
+  function updateInvoiceField(field, value) {
+    pushUndo();
+    allData.forEach(r => {
+      if (r.invoice_number === currentInvoice) {
+        r[field] = value;
+      }
+    });
+    updateStats();
+  }
 
-        // Load reference files on page load
-        loadReferenceFiles();
-    </script>
+  function updateInvoiceTotal(value) {
+    updateInvoiceField('invoice_total', value);
+  }
+
+  function addRowBelow(globalIdx) {
+    const base = allData[globalIdx];
+    if (!base) return;
+    const newRow = {
+      invoice_number: base.invoice_number,
+      invoice_date:   base.invoice_date,
+      invoice_total:  base.invoice_total,
+      supplier:       base.supplier,
+      position: '',
+      part_number: '',
+      quantity: '',
+      unit: base.unit || 'PC',
+      unit_price: '',
+      line_total: '',
+      net_weight: base.net_weight || '',
+      country_of_origin: base.country_of_origin || '',
+      hts_code: base.hts_code || '',
+      steel_kg: base.steel_kg || '',
+      aluminum_kg: base.aluminum_kg || '',
+      copper_kg: base.copper_kg || ''
+    };
+    allData.splice(globalIdx + 1, 0, newRow);
+    loadInvoiceData();
+  }
+
+  function deleteRow(globalIdx) {
+    if (globalIdx < 0 || globalIdx >= allData.length) return;
+    allData.splice(globalIdx, 1);
+    loadInvoiceData();
+  }
+
+  function resetUpload() {
+    allData = [];
+    invoiceOrder = [];
+    currentInvoice = '';
+    uploadedPdfName = '';
+    undoStack = [];
+    fileInput.value = '';
+    invoiceSelect.innerHTML = '<option value="">Select an invoice...</option>';
+    controls.style.display = 'none';
+    stats.style.display = 'none';
+    tableCont.style.display = 'none';
+    uploadSec.style.display = 'block';
+  }
+
+  // ========= EXPORT TO DESCARTES TEMPLATE =========
+  function buildDescartesRow(item) {
+    const row = {
+      'InvoiceNumber': item.invoice_number || "",
+      'InvoiceDate': item.invoice_date || "",
+      'InvoiceTotal': item.invoice_total || "",
+      'SupplierMID': "",
+      'SupplierName': item.supplier || "",
+      'BuyerPartNumber': item.part_number || "",
+      'SupplierPartNumber': item.part_number || "",
+      'Quantity': item.quantity || "",
+      'UnitOfMeasure': item.unit || "",
+      'Description': "",
+      'UnitPrice': "",
+      'ItemTotal': item.line_total || "",
+      'CurrencyCode': "USD",
+      'ExchangeRate': "",
+      'CountryOfOrigin': item.country_of_origin || "",
+      'CountryOfExport': "",
+      'DateOfExport': "",
+      'PortOfLading': "",
+      'RelatedParty': "",
+      'PO_Number': "",
+      'PO_Date': "",
+      'GrossWeight': "",
+      'GrossWeightUnit': "",
+      'NetWeight': item.net_weight || "",
+      'TariffNumber': item.hts_code || "",
+      'TariffDescription': "",
+      'Quantity1': "",
+      'UnitOfMeasure1': "",
+      'Quantity2': "",
+      'UnitOfMeasure2': "",
+      'Quantity3': "",
+      'UnitOfMeasure3': "",
+      'PrimarySPI': "",
+      'SecondarySPI': "",
+      'DeliverTo': "",
+      'SoldTo': "",
+      'SellerMID': "",
+      'ShipperMID': "",
+      'EntryDate': "",
+      'ArrivalDate': "",
+      'Carrier': "",
+      'Vessel': "",
+      'Voyage': "",
+      'PortOfEntry': "",
+      'PortOfUnloading': "",
+      'LocationCode': "",
+      'TotalCharges': "",
+      'BillOfLadingNumber': "",
+      'Container': "",
+      'SecondaryTariffNumber': "",
+      'SecondaryTariffdescription': "",
+      'Secondary Quantity1': "",
+      'Secondaryunitofmeasure1': "",
+      'secondaryquantity2': "",
+      'secondaryunitofmeasure2': "",
+      'secondaryquantity3': "",
+      'secondaryunitofmeasure3': "",
+      'secondaryvalue': "",
+      'FTZStatus': "",
+      'FTZPrivilegedDate\u00a0': "",
+      'ThirdTariffNumber': "",
+      'ThirdTariffDescription': "",
+      'ThirdTariffQuantity1': "",
+      'ThirdTariffUnitofMeasure1': "",
+      'ThirdTariffQuantity2': "",
+      'ThirdTariffUnitofMeasure2': "",
+      'ThirdTariffQuantity3': "",
+      'ThirdTariffUnitofMeasure3': "",
+      'Third Value': "",
+      '4TariffNumber': "",
+      '4TariffDescription': "",
+      '4TariffQuantity1': "",
+      '4TariffUnitofMeasure1': "",
+      '4TariffQuantity2': "",
+      '4TariffUnitofMeasure2': "",
+      '4TariffQuantity3': "",
+      '4TariffUnitofMeasure3': "",
+      '4 Value': "",
+      '5TariffNumber': "",
+      '5TariffDescription': "",
+      '5TariffQuantity1': "",
+      '5TariffUnitofMeasure1': "",
+      '5TariffQuantity2': "",
+      '5TariffUnitofMeasure2': "",
+      '5TariffQuantity3': "",
+      '5TariffUnitofMeasure3': "",
+      '5 Value': ""
+    };
+    row['UnitPrice'] = computeExportUnitPrice({quantity: item.quantity, line_total: item.line_total});
+    return row;
+  }
+
+  function exportToDescartes() {
+    if (!allData.length) {
+      showAlert('No data to export.', 'error');
+      return;
+    }
+
+    // Sort by invoice then position (numeric, then A/B suffix)
+    const items = allData.slice().sort((a,b) => {
+      const ai = String(a.invoice_number || '');
+      const bi = String(b.invoice_number || '');
+      if (ai !== bi) return ai.localeCompare(bi);
+      const A = (String(a.position || '').match(/^(\d+)([A-Z]?)$/) || []);
+      const B = (String(b.position || '').match(/^(\d+)([A-Z]?)$/) || []);
+      const an = parseInt(A[1] || '999999',10);
+      const bn = parseInt(B[1] || '999999',10);
+      if (an !== bn) return an - bn;
+      return (A[2] || '').localeCompare(B[2] || '');
+    });
+
+    const rows = items.map(it => buildDescartesRow(it));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb, ws, 'Descartes');
+
+    const fname = (uploadedPdfName ? uploadedPdfName + '_' : '') + 'eisenmann_descartes.xlsx';
+    XLSX.writeFile(wb, fname);
+  }
+</script>
 </body>
 </html>
