@@ -127,6 +127,18 @@
       <div class="stat-label">Difference</div>
       <div class="stat-value" id="statDiff"></div>
     </div>
+    <div class="stat">
+      <div class="stat-label">Steel Content (kg)</div>
+      <div class="stat-value" id="statSteel">-</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Aluminum Content (kg)</div>
+      <div class="stat-value" id="statAlum">-</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Copper Content (kg)</div>
+      <div class="stat-value" id="statCopper">-</div>
+    </div>
   </div>
 
   <div class="table-container" id="tableContainer">
@@ -160,9 +172,11 @@
 </div>
 
 <script>
+  // ===== PDF.js worker =====
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+  // ===== GLOBAL STATE =====
   let allData = [];
   let currentInvoice = '';
   let invoiceOrder = [];
@@ -191,6 +205,7 @@
     });
   }
 
+  // ===== HELPERS =====
   function showAlert(msg, type='success') {
     alertBox.textContent = msg;
     alertBox.style.display = 'block';
@@ -213,6 +228,7 @@
     return isNaN(n) ? NaN : n;
   }
 
+  // EU/US flexible number parser
   function parseNum(s){
     if (s == null) return NaN;
     const t = String(s).trim();
@@ -243,6 +259,7 @@
     return '';
   }
 
+  // ===== UNDO =====
   function pushUndo() {
     undoStack.push(JSON.parse(JSON.stringify(allData)));
     if (undoStack.length > 50) undoStack.shift();
@@ -267,6 +284,7 @@
     showAlert('Last change undone.', 'success');
   }
 
+  // ===== FILE HANDLING =====
   function isPdfFile(file) {
     const nameOk = (file.name || '').toLowerCase().endsWith('.pdf');
     const typeOk = (file.type || '').toLowerCase() === 'application/pdf';
@@ -307,22 +325,24 @@
       const uint8 = new Uint8Array(arrayBuffer);
       const pdf = await pdfjsLib.getDocument({ data: uint8 }).promise;
 
-      let fullText = '';
+      const pagesText = [];
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent({ includeMarkedContent: true });
         const items = (textContent && Array.isArray(textContent.items)) ? textContent.items : [];
-        const pageText = items.map(it => (it && typeof it.str === 'string') ? it.str : '').join(' ');
-        fullText += pageText + '\n';
+        const pageText = items
+          .map(it => (it && typeof it.str === 'string') ? it.str : '')
+          .join(' ');
+        pagesText.push(pageText);
       }
 
-      if (!fullText.trim()) {
+      if (!pagesText.some(t => t && t.trim())) {
         showAlert('The PDF had no extractable text (might be scanned).', 'error');
         uploadSec.style.display = 'block';
         return;
       }
 
-      parseInvoices(fullText);
+      parseInvoices(pagesText);
 
       if (allData.length) {
         const invoiceCount = new Set(allData.map(d => d.invoice_number)).size;
@@ -341,54 +361,48 @@
     }
   }
 
-  function parseInvoices(text) {
+  // ===== CORE PARSER (PER PAGE / PER INVOICE) =====
+  function parseInvoices(pagesText) {
     allData = [];
     invoiceOrder = [];
-    text = String(text || '');
 
-    const invoicePattern =
+    const headerRegex =
       /Invoice\s*no\.\s*\/\s*(?:Date|Datum):\s*([0-9]+)\s*\/\s*(\d{2}\/\d{2}\/\d{4})/g;
 
-    const headers = [];
-    let m;
-    let lastInv = null;
-
-    while ((m = invoicePattern.exec(text)) !== null) {
-      const invNum = m[1];
-      const invDate = m[2];
-      if (invNum === lastInv) continue; // skip duplicate headers on page 2
-      headers.push({
-        index: m.index,
-        invoice_number: invNum,
-        invoice_date: invDate
-      });
-      lastInv = invNum;
+    const invoices = [];
+    for (let p = 0; p < pagesText.length; p++) {
+      const txt = pagesText[p];
+      let m;
+      while ((m = headerRegex.exec(txt)) !== null) {
+        invoices.push({
+          pageIndex: p,
+          invoice_number: m[1],
+          invoice_date: m[2]
+        });
+      }
     }
-    headers.push({ index: text.length, invoice_number: null, invoice_date: null });
 
     const linePattern =
       /(\d{5,6})\s+([A-Z0-9]+)\s+(\d+)\s*(PC)?\s+([\d.,]+)\s+USD\s+(\d+)\s*(PC)?\s+([\d.,]+)/g;
 
-    for (let i = 0; i < headers.length - 1; i++) {
-      const startIdx = headers[i].index;
-      const endIdx   = headers[i + 1].index;
-      const invNum   = headers[i].invoice_number;
-      const invDate  = headers[i].invoice_date;
+    invoices.forEach(inv => {
+      const p = inv.pageIndex;
+      let block = pagesText[p] || '';
+      if (p > 0) {
+        block = (pagesText[p - 1] || '') + ' ' + block;
+      }
 
-      if (!invNum) continue;
-      const block = text.slice(startIdx, endIdx);
-
-      // Invoice total: "Netamount 4,398.92" or "Net amount 4,398.92"
+      // Net amount (invoice total)
       let invoiceTotal = '';
       const totalMatch = block.match(/Net\s*amount\s+([\d.,]+)/i);
       if (totalMatch) invoiceTotal = totalMatch[1];
 
-      // Net Weight: "Net Weight 78.000 KG"
+      // Net Weight
       let invoiceNetWeight = '';
       const netWMatch = block.match(/Net\s*Weight\s+([\d.,]+)\s*KG/i);
       if (netWMatch) invoiceNetWeight = netWMatch[1];
 
-      // Metals: "Steel content 100%: 47,2 kg", etc.
+      // Metals: Steel / Aluminum / Copper
       let steelTotalKg = 0;
       let aluminumTotalKg = 0;
       let copperTotalKg = 0;
@@ -413,9 +427,10 @@
       const lineMatches = [...block.matchAll(linePattern)];
 
       if (!lineMatches.length) {
+        // Fallback so invoice header still appears
         allData.push({
-          invoice_number: invNum,
-          invoice_date:   invDate,
+          invoice_number: inv.invoice_number,
+          invoice_date:   inv.invoice_date,
           invoice_total:  invoiceTotal,
           supplier:       'Eisenmann GmbH',
           position: '',
@@ -431,7 +446,7 @@
           aluminum_kg: aluminumStr,
           copper_kg:  copperStr
         });
-        continue;
+        return;
       }
 
       lineMatches.forEach(lm => {
@@ -459,8 +474,8 @@
         }
 
         allData.push({
-          invoice_number: invNum,
-          invoice_date:   invDate,
+          invoice_number: inv.invoice_number,
+          invoice_date:   inv.invoice_date,
           invoice_total:  invoiceTotal,
           supplier:       'Eisenmann GmbH',
           position:       position,
@@ -477,11 +492,12 @@
           copper_kg:      copperStr
         });
       });
-    }
+    });
 
     invoiceOrder = [...new Set(allData.map(r => r.invoice_number))];
   }
 
+  // ===== UI SETUP / RENDERING =====
   function setupInterface() {
     if (!invoiceOrder.length) return;
 
@@ -579,6 +595,9 @@
     const statTotal    = document.getElementById('statTotal');
     const statSum      = document.getElementById('statSum');
     const statDiff     = document.getElementById('statDiff');
+    const statSteel    = document.getElementById('statSteel');
+    const statAlum     = document.getElementById('statAlum');
+    const statCopper   = document.getElementById('statCopper');
 
     statInvoice.textContent = currentInvoice || '-';
 
@@ -587,11 +606,17 @@
       statSupplier.value = rows[0].supplier || 'Eisenmann GmbH';
       statItems.textContent = rows.length;
       statTotal.value    = rows[0].invoice_total || '';
+      statSteel.textContent  = rows[0].steel_kg   || (rows[0].steel_kg === 0 ? '0' : '-');
+      statAlum.textContent   = rows[0].aluminum_kg|| (rows[0].aluminum_kg === 0 ? '0' : '-');
+      statCopper.textContent = rows[0].copper_kg  || (rows[0].copper_kg === 0 ? '0' : '-');
     } else {
       statDate.value = '';
       statSupplier.value = '';
       statItems.textContent = '0';
       statTotal.value = '';
+      statSteel.textContent = '-';
+      statAlum.textContent = '-';
+      statCopper.textContent = '-';
     }
 
     let sum = 0;
@@ -605,7 +630,7 @@
     statDiff.classList.remove('success','error');
 
     if (isNaN(invTotal)) {
-      // no valid invoice total -> leave Difference blank
+      // No valid invoice total parsed -> leave Difference blank
       statDiff.textContent = '';
     } else {
       const diff = invTotal - sum;
@@ -677,6 +702,7 @@
     uploadSec.style.display = 'block';
   }
 
+  // ===== EXPORT TO DESCARTES TEMPLATE =====
   function buildDescartesRow(item) {
     const row = {
       'InvoiceNumber': item.invoice_number || "",
